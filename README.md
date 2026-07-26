@@ -6,7 +6,7 @@ Translates plain English questions into SQL queries against a 9-table Brazilian 
 
 ## Inspiration
 
-This is inspired from my previous role in data analytics. I was supporting various credit card portfolio teams (since my company did credit cards for various retail partners), and I would answer their questions. With more AI tools, I wanted to see if the process for writing SQL queries could be automated (and its implication for my role).
+This is inspired from my previous role in data analytics. I was supporting various credit card portfolio teams (since my company did credit cards for various retail partners), and I would answer their questions. With more AI tools coming around, I wanted to see if the process for writing SQL queries could be automated (and its implication for my role). I had also taken Machine Learning at school Spring of 2026 and wanted to use what I learned from that class and my group project to use industry tools to create something I cared about.
 
 
 
@@ -27,7 +27,6 @@ nl2sql/
   ui/           app.py (Streamlit dashboard)
 ```
 
-The schema tool, execute tool, agent loop, and eval harness are all separate modules. Same structure as Moneypenny: tools layer talks to data, core layer has the logic, UI layer shows it.
 
 ## Results
 
@@ -42,31 +41,31 @@ Evaluated on 30 questions (8 easy, 12 medium, 10 hard) with gold-standard SQL. S
 
 Average latency: 2.01s per question. Almost everything passed on the first attempt (29/30).
 
-The baseline is a naive keyword-to-table mapper with template queries. It exists so the LLM number has something to sit against. "60% accuracy" alone is just a number. "60% vs 10% baseline" is a comparison.
+The baseline is a naive keyword-to-table mapper with template queries. It exists so the LLM number has something to sit against. 
 
 ## Failure Points
 
-Three systematic failure patterns, not random errors.
+Three systematic failure patterns.
 
 **1. Portuguese vs English category names**
 
-The model joins to `category\_translation` and returns English names like "bed\_bath\_table" when the gold SQL uses the raw Portuguese "cama\_mesa\_banho". The underlying query logic is correct, the counts match, but the eval marks it wrong because the strings differ. This accounts for 4 of the 12 misses (Q9, Q15, Q20, Q24). Could fix this in the gold SQL but left it as-is because it surfaces a real ambiguity: should the agent translate or not?
+The model joins to `category\_translation` and returns English names like "bed\_bath\_table" when the gold SQL uses the raw Portuguese "cama\_mesa\_banho". The underlying query logic is correct, the counts match, but the eval marks it wrong because the strings differ. This accounts for 4 of the 12 misses (Q9, Q15, Q20, Q24). Could fix this in the gold SQL but left it as-is because it surfaces a real ambiguity on if the agent translate or not.
 
 **2. Column selection mismatch**
 
-Questions like "which city has the most sellers?" — the model returns just the city name, gold SQL returns the city AND the count. The answer is right, the format isn't. Another 4 questions (Q11, Q12, Q16, Q21). The model interpreted "which" as asking for a name, not a name + number. Both readings are defensible.
+Questions like "which city has the most sellers?". The model returns just the city name, gold SQL returns the city AND the count. The answer is right, the format isn't. Another 4 questions (Q11, Q12, Q16, Q21). The model interpreted "which" as asking for a name, not a name + number. 
 
 **3. Rounding and grain differences**
 
 Growth rates returned as decimals (0.0718) vs percentages (7.18). Sort order differences when the question doesn't specify. These are the genuinely hard ones where the model and the gold SQL made different but reasonable choices.
 
-The retry loop only catches execution errors (bad syntax, missing columns). A query that runs fine but answers the wrong question never errors out. That gap is why the eval exists.
+The retry loop only catches execution errors (bad syntax, missing columns). A query that runs fine but answers the wrong question never errors out. 
 
 ## What would make this better
 
 * Retrieve only relevant tables instead of dumping the full schema every time. The prompt is \~2K tokens right now, which is fine for 9 tables but wouldn't scale.
 * Add a few-shot examples from the eval set. Take the 5 hardest questions the model gets right and include them as examples in the prompt. Usually adds 5-10% on the hard tier.
-* Run a second LLM pass that checks grain before returning. "Does this result have the right number of rows and columns for this question?" Would catch the column selection mismatches.
+* Run a second LLM pass that checks grain before returning. Answering questions like does this result have the right number of rows and columns for this question? Would catch the column selection mismatches.
 
 ## Setup
 
