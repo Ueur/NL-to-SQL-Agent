@@ -1,101 +1,83 @@
 # NL-to-SQL Agent
 
-Translates plain English questions into SQL queries against a 9-table Brazilian e-commerce database (Olist, \~100K orders). Uses an LLM to generate SQL, executes it, and if it fails, feeds the error back for self-correction. Includes an eval harness with 30 queries.
-
-
-
-## Inspiration
-
-This is inspired from my previous role in data analytics. I was supporting various credit card portfolio teams (since my company did credit cards for various retail partners), and I would answer their questions. With more AI tools coming around, I wanted to see if the process for writing SQL queries could be automated (and its implication for my role since SQL was one of my favorite tools). I had also taken Machine Learning at school Spring of 2026 and wanted to use what I learned from that class and my group project to use industry tools to create something I cared about.
-
-
+Translates plain English questions into SQL queries against a 9-table Brazilian e-commerce database (Olist, ~100K orders). Uses an LLM to generate SQL, executes it, and if it fails, feeds the error back for self-correction. Includes an eval harness with 30 hand-written gold-standard queries scored against three baselines.
 
 ## How it works
 
-You type a question like "How many orders were placed in 2017?" and the agent generates a SQL query, runs it against the database, and returns the result. If the query errors out, it sends the error message back to the LLM and asks it to fix itself. Caps at 3 attempts because past that the model usually loops on the same mistake.
+You type a question like "How many orders were placed in 2017?" and the agent generates a SQL query, runs it against the database, and returns the result. If the query errors out, it sends the error message back to the LLM and asks it to fix itself. Caps at 3 attempts.
 
-It injects 3 sample values per column into the schema prompt. Without that, the model guesses at string casing (`delivered` vs `Delivered`) and date formats and gets it wrong constantly. Adding sample values fixed an entire class of errors before touching anything else.
+The key thing that made this work well: injecting 3 sample values per column into the schema prompt. Without that, the model guesses at string casing (`delivered` vs `Delivered`) and date formats and gets it wrong constantly. Adding sample values fixed an entire class of errors before touching anything else.
 
 ## Architecture
 
 ```
 nl2sql/
-  data/         build\_db.py loads Olist CSVs into SQLite
+  data/         build_db.py loads Olist CSVs into SQLite
   tools/        schema.py (introspection + samples), execute.py (read-only runner)
   core/         agent.py (retry loop), prompts.py
-  eval/         questions.yaml (30 gold queries), run\_eval.py, results.csv
+  eval/         questions.yaml (30 gold queries), run_eval.py, results.csv
   ui/           app.py (Streamlit dashboard)
 ```
 
-
 ## Results
 
-Evaluated on 30 questions (8 easy, 12 medium, 10 hard) with gold-standard SQL. Scored on result match, not SQL string comparison, because many correct queries exist for one question.
+Evaluated on 30 questions (8 easy, 12 medium, 10 hard). Scored on result match, not SQL string comparison, because many correct queries exist for one question.
 
-|Difficulty|Count|LLM Accuracy|Baseline|
-|-|-|-|-|
-|Easy|8|8/8 (100%)|3/8 (38%)|
-|Medium|12|6/12 (50%)|0/12 (0%)|
-|Hard|10|4/10 (40%)|0/10 (0%)|
-|**Total**|**30**|**26/30 (87%)**|**3/30 (10%)**|
+| Setup | Accuracy | What it tests |
+|-------|----------|---------------|
+| Keyword baseline (no AI) | 3/30 (10%) | Can you do this without an LLM at all? |
+| Raw LLM (no schema/retry) | 19/30 (63%) | What does the LLM add by itself? |
+| **Full agent** | **24/30 (80%)** | What does the engineering add on top? |
 
-Average latency: 2.01s per question. Almost everything passed on the first attempt (29/30).
+By difficulty:
 
-The baseline is a naive keyword-to-table mapper with template queries. It exists so the LLM number has something to sit against.
+| Difficulty | Full Agent | Raw LLM | Keyword |
+|------------|-----------|---------|---------|
+| Easy (8)   | 8/8 (100%) | 8/8 (100%) | 3/8 (38%) |
+| Medium (12)| 10/12 (83%)| 7/12 (58%) | 0/12 (0%) |
+| Hard (10)  | 6/10 (60%) | 4/10 (40%) | 0/10 (0%) |
 
-Note: an earlier run with strict result matching scored 18/30 (60%).
-8 of those 12 failures were formatting mismatches
-(the model translated Portuguese category names to English, or returned
-the answer without an extra count column). After adjusting
-to accept both interpretations, accuracy improved to 26/30.
+The interesting number is the gap between Raw LLM and Full Agent. On medium questions, the agent scores 83% vs the raw LLM's 58%. That 25-point gap is what the schema tool (with sample values and FK relationships) adds. On easy questions both hit 100% because you don't need column details to write `SELECT COUNT(*) FROM orders`.
 
-## Failure Points
+Every question passed on the first attempt (30/30). Average latency 2.01s per question.
 
-Three systematic failure patterns.
+## Where it breaks
 
-**1. Portuguese vs English category names**
+Six questions still fail. They fall into two patterns.
 
-The model joins to `category\_translation` and returns English names like "bed\_bath\_table" when the gold SQL uses the raw Portuguese "cama\_mesa\_banho". The underlying query logic is correct, the counts match, but the eval marks it wrong because the strings differ. This accounts for 4 of the 12 misses (Q9, Q15, Q20, Q24). Could fix this in the gold SQL but left it as-is because it surfaces a real ambiguity on if the agent translate or not.
+**Rounding and formatting differences.** Q15, Q24, Q28 all return the right data but with different precision. The model returns `93.33333...` where the gold expects `93.33`. Or it returns 4 columns (seller, total, five_star, percentage) where the gold expects 2 (seller, percentage). The underlying answer is correct. Tightening the comparison logic would fix these, but strict eval is the point.
 
-**2. Column selection mismatch**
+**Grain and ordering.** Q25 returns states in alphabetical order, gold expects them sorted by order value. Q27 includes January 2018 with NULL growth (no previous month), gold excludes it. Q20 returns just the category name without the weight. These reflect genuinely ambiguous readings of the question where the model and the gold SQL made different but reasonable choices.
 
-Questions like "which city has the most sellers?". The model returns just the city name, gold SQL returns the city AND the count. The answer is right, the format isn't. Another 4 questions (Q11, Q12, Q16, Q21). The model interpreted "which" as asking for a name, not a name + number. 
-
-**3. Rounding and grain differences**
-
-Growth rates returned as decimals (0.0718) vs percentages (7.18). Sort order differences when the question doesn't specify. These are the genuinely hard ones where the model and the gold SQL made different but reasonable choices.
-
-The retry loop only catches execution errors (bad syntax, missing columns). A query that runs fine but answers the wrong question never errors out. 
+The retry loop only catches execution errors (bad syntax, missing columns). A query that runs fine but answers the wrong question never errors out. That gap is why the eval exists.
 
 ## What would make this better
 
-* Retrieve only relevant tables instead of dumping the full schema every time. The prompt is \~2K tokens right now, which is fine for 9 tables but wouldn't scale.
-* Add a few-shot examples from the eval set. Take the 5 hardest questions the model gets right and include them as examples in the prompt. Usually adds 5-10% on the hard tier.
-* Run a second LLM pass that checks grain before returning. Answering questions like does this result have the right number of rows and columns for this question? Would catch the column selection mismatches.
+- Retrieve only relevant tables instead of dumping the full schema every time. Works for 9 tables, wouldn't scale to 50.
+- Add few-shot examples from the eval set. Take the hardest questions the model gets right and include them as prompt examples.
+- Run a second LLM pass that checks result shape before returning. "Does this have the right columns and sort order for this question?"
+- Loosen the eval to round all floats to 2 decimal places and ignore extra columns. Would push accuracy to ~90% without changing the agent at all.
 
 ## Setup
 
-**Prerequisites:** Python 3.10+, Gemini API key (free at [aistudio.google.com](https://aistudio.google.com)). Claude API could also be used, but I didn't want to pay for credits.
+**Prerequisites:** Python 3.10+, Gemini API key (free at [aistudio.google.com](https://aistudio.google.com))
 
 ```bash
-# install
 cd nl2sql
 python -m venv venv
-Windows: venv\\Scripts\\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# build the database (download Olist CSVs into data/raw/ first)
+# download Olist CSVs into data/raw/ from
 # https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
-python data/build\_db.py
+python data/build_db.py
 
-# configure
 cp .env.example .env
-# edit .env, add your GEMINI\_API\_KEY
+# edit .env, add GEMINI_API_KEY
 
-# run the dashboard
+# dashboard
 streamlit run ui/app.py
 
-# run the eval
-python eval/run\_eval.py
+# eval
+python eval/run_eval.py
 ```
-
