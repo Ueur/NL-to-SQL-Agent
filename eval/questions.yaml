@@ -1,14 +1,8 @@
-# =============================================================================
-# NL-to-SQL Evaluation Set — Olist Brazilian E-Commerce
-# =============================================================================
+# NL-to-SQL Eval Set — Olist Brazilian E-Commerce
 # 30 questions: 8 easy, 12 medium, 10 hard
-# Gold SQL is the canonical correct query. Eval compares RESULTS, not SQL text,
-# because many valid queries exist for each question.
-# =============================================================================
+# Scored on result match, not SQL text.
 
-# ---------------------------------------------------------------------------
-# EASY (8): single table, filter, count, simple aggregate
-# ---------------------------------------------------------------------------
+# --- EASY (8) ---
 
 - id: 1
   question: "How many unique customers are in the database?"
@@ -77,18 +71,18 @@
   tags: [single_table, group_by, order_limit]
   order_matters: true
 
-# ---------------------------------------------------------------------------
-# MEDIUM (12): 1–2 joins, group by, aggregation, ordering
-# ---------------------------------------------------------------------------
+# --- MEDIUM (12) ---
 
 - id: 9
   question: "What are the top 5 product categories by number of items sold?"
   gold_sql: |
-    SELECT p.product_category_name, COUNT(*) AS items_sold
+    SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+           COUNT(*) AS items_sold
     FROM order_items oi
     JOIN products p ON oi.product_id = p.product_id
+    LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
     WHERE p.product_category_name IS NOT NULL
-    GROUP BY p.product_category_name
+    GROUP BY category
     ORDER BY items_sold DESC
     LIMIT 5
   difficulty: medium
@@ -109,8 +103,8 @@
 - id: 11
   question: "Which city has the most sellers?"
   gold_sql: |
-    SELECT seller_city, COUNT(*) AS cnt
-    FROM sellers GROUP BY seller_city ORDER BY cnt DESC LIMIT 1
+    SELECT seller_city FROM sellers
+    GROUP BY seller_city ORDER BY COUNT(*) DESC LIMIT 1
   difficulty: medium
   tags: [single_table, group_by, order_limit]
   order_matters: false
@@ -118,8 +112,8 @@
 - id: 12
   question: "Which payment type has the highest average payment value?"
   gold_sql: |
-    SELECT payment_type, ROUND(AVG(payment_value), 2) AS avg_val
-    FROM order_payments GROUP BY payment_type ORDER BY avg_val DESC LIMIT 1
+    SELECT payment_type FROM order_payments
+    GROUP BY payment_type ORDER BY AVG(payment_value) DESC LIMIT 1
   difficulty: medium
   tags: [single_table, group_by, aggregate]
   order_matters: false
@@ -147,12 +141,14 @@
 - id: 15
   question: "What is the average review score per product category? Show the top 10."
   gold_sql: |
-    SELECT p.product_category_name, ROUND(AVG(r.review_score), 2) AS avg_score
+    SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+           ROUND(AVG(r.review_score), 2) AS avg_score
     FROM order_reviews r
     JOIN order_items oi ON r.order_id = oi.order_id
     JOIN products p ON oi.product_id = p.product_id
+    LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
     WHERE p.product_category_name IS NOT NULL
-    GROUP BY p.product_category_name
+    GROUP BY category
     ORDER BY avg_score DESC
     LIMIT 10
   difficulty: medium
@@ -162,12 +158,12 @@
 - id: 16
   question: "Which customer state has the highest total order value?"
   gold_sql: |
-    SELECT c.customer_state, ROUND(SUM(oi.price), 2) AS total_value
+    SELECT c.customer_state
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     JOIN customers c ON o.customer_id = c.customer_id
     GROUP BY c.customer_state
-    ORDER BY total_value DESC
+    ORDER BY SUM(oi.price) DESC
     LIMIT 1
   difficulty: medium
   tags: [multi_join, group_by, aggregate]
@@ -212,30 +208,29 @@
 - id: 20
   question: "What product category has the highest average product weight?"
   gold_sql: |
-    SELECT product_category_name, ROUND(AVG(product_weight_g), 2) AS avg_weight
-    FROM products
-    WHERE product_category_name IS NOT NULL AND product_weight_g IS NOT NULL
-    GROUP BY product_category_name
+    SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+           ROUND(AVG(p.product_weight_g), 2) AS avg_weight
+    FROM products p
+    LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
+    WHERE p.product_category_name IS NOT NULL AND p.product_weight_g IS NOT NULL
+    GROUP BY category
     ORDER BY avg_weight DESC
     LIMIT 1
   difficulty: medium
-  tags: [single_table, group_by, aggregate, null_handling]
+  tags: [join, group_by, aggregate, null_handling]
   order_matters: false
 
-# ---------------------------------------------------------------------------
-# HARD (10): multi-join fan-out risk, date arithmetic, subquery/window,
-#            ambiguous questions
-# ---------------------------------------------------------------------------
+# --- HARD (10) ---
 
 - id: 21
   question: "Which seller had the highest average review score, among sellers with at least 50 orders?"
   gold_sql: |
-    SELECT oi.seller_id, ROUND(AVG(r.review_score), 2) AS avg_score
+    SELECT oi.seller_id
     FROM order_items oi
     JOIN order_reviews r ON oi.order_id = r.order_id
     GROUP BY oi.seller_id
     HAVING COUNT(DISTINCT oi.order_id) >= 50
-    ORDER BY avg_score DESC
+    ORDER BY AVG(r.review_score) DESC
     LIMIT 1
   difficulty: hard
   tags: [join, having, aggregate, fan_out_risk]
@@ -278,14 +273,15 @@
 - id: 24
   question: "What is the cancellation rate by product category? Show categories with at least 20 orders."
   gold_sql: |
-    SELECT p.product_category_name,
+    SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
            ROUND(100.0 * SUM(CASE WHEN o.order_status = 'canceled' THEN 1 ELSE 0 END)
                  / COUNT(DISTINCT o.order_id), 2) AS cancel_rate_pct
     FROM order_items oi
     JOIN orders o ON oi.order_id = o.order_id
     JOIN products p ON oi.product_id = p.product_id
+    LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
     WHERE p.product_category_name IS NOT NULL
-    GROUP BY p.product_category_name
+    GROUP BY category
     HAVING COUNT(DISTINCT o.order_id) >= 20
     ORDER BY cancel_rate_pct DESC
   difficulty: hard

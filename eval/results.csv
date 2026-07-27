@@ -1,151 +1,232 @@
-id,question,difficulty,tags,llm_correct,llm_attempts,llm_latency_s,llm_sql,baseline_correct,baseline_sql,gold_sql
-1,How many unique customers are in the database?,easy,single_table|count|distinct,True,1,1.41,SELECT COUNT(DISTINCT customer_unique_id) FROM customers;,False,SELECT COUNT(*) FROM customers,SELECT COUNT(DISTINCT customer_unique_id) FROM customers
-2,How many orders have the status 'delivered'?,easy,single_table|filter|count,True,1,0.83,SELECT COUNT(order_id) FROM orders WHERE order_status = 'delivered';,False,SELECT COUNT(*) FROM orders,SELECT COUNT(*) FROM orders WHERE order_status = 'delivered'
-3,What are all the distinct order statuses?,easy,single_table|distinct,True,1,0.61,SELECT DISTINCT order_status FROM orders;,True,SELECT DISTINCT order_status FROM orders ORDER BY order_status,SELECT DISTINCT order_status FROM orders ORDER BY order_status
-4,How many sellers are located in the state of SP?,easy,single_table|filter|count,True,1,0.84,SELECT COUNT(seller_id) FROM sellers WHERE seller_state = 'SP';,False,SELECT COUNT(*) FROM sellers,SELECT COUNT(*) FROM sellers WHERE seller_state = 'SP'
-5,What is the average review score across all reviews?,easy,single_table|aggregate,True,1,0.76,SELECT AVG(review_score) FROM order_reviews;,True,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT ROUND(AVG(review_score), 4) FROM order_reviews"
-6,What is the most common payment type?,easy,single_table|group_by|order_limit,True,1,0.89,"SELECT payment_type
-FROM order_payments
-GROUP BY payment_type
-ORDER BY COUNT(*) DESC
-LIMIT 1;",True,SELECT payment_type FROM order_payments GROUP BY payment_type ORDER BY COUNT(*) DESC LIMIT 1,"SELECT payment_type FROM order_payments
+id,question,difficulty,tags,agent_correct,agent_attempts,agent_latency_s,agent_sql,raw_llm_correct,raw_llm_sql,keyword_correct,keyword_sql,gold_sql
+1,How many unique customers are in the database?,easy,single_table|count|distinct,True,1,1.55,SELECT COUNT(DISTINCT customer_unique_id) FROM customers;,True,SELECT count(DISTINCT customer_unique_id) FROM customers;,False,SELECT COUNT(*) FROM customers,SELECT COUNT(DISTINCT customer_unique_id) FROM customers
+2,How many orders have the status 'delivered'?,easy,single_table|filter|count,True,1,1.1,SELECT COUNT(order_id) FROM orders WHERE order_status = 'delivered',True,SELECT count(order_id) FROM orders WHERE order_status = 'delivered',False,SELECT COUNT(*) FROM orders,SELECT COUNT(*) FROM orders WHERE order_status = 'delivered'
+3,What are all the distinct order statuses?,easy,single_table|distinct,True,1,0.59,SELECT DISTINCT order_status FROM orders,True,SELECT DISTINCT order_status FROM orders;,True,SELECT DISTINCT order_status FROM orders ORDER BY order_status,SELECT DISTINCT order_status FROM orders ORDER BY order_status
+4,How many sellers are located in the state of SP?,easy,single_table|filter|count,True,1,0.82,SELECT COUNT(seller_id) FROM sellers WHERE seller_state = 'SP',True,SELECT count(seller_id) FROM sellers WHERE seller_state = 'SP',False,SELECT COUNT(*) FROM sellers,SELECT COUNT(*) FROM sellers WHERE seller_state = 'SP'
+5,What is the average review score across all reviews?,easy,single_table|aggregate,True,1,0.75,SELECT AVG(review_score) FROM order_reviews;,True,SELECT avg(review_score) FROM order_reviews,True,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT ROUND(AVG(review_score), 4) FROM order_reviews"
+6,What is the most common payment type?,easy,single_table|group_by|order_limit,True,1,0.71,"SELECT payment_type 
+FROM order_payments 
+GROUP BY payment_type 
+ORDER BY COUNT(*) DESC 
+LIMIT 1",True,SELECT payment_type FROM order_payments GROUP BY payment_type ORDER BY count(*) DESC LIMIT 1,True,SELECT payment_type FROM order_payments GROUP BY payment_type ORDER BY COUNT(*) DESC LIMIT 1,"SELECT payment_type FROM order_payments
 GROUP BY payment_type ORDER BY COUNT(*) DESC LIMIT 1"
-7,How many orders were placed in 2017?,easy,single_table|date|filter|count,True,1,0.97,"SELECT COUNT(order_id) FROM orders WHERE substr(order_purchase_timestamp, 1, 4) = '2017'",False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM orders
+7,How many orders were placed in 2017?,easy,single_table|date|filter|count,True,1,1.06,"SELECT COUNT(*) 
+FROM orders 
+WHERE substr(order_purchase_timestamp, 1, 4) = '2017'",True,"SELECT count(order_id) FROM orders WHERE strftime('%Y', order_purchase_timestamp) = '2017'",False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM orders
 WHERE substr(order_purchase_timestamp, 1, 4) = '2017'"
-8,What are the top 5 customer cities by number of customers?,easy,single_table|group_by|order_limit,True,1,1.21,"SELECT customer_city, COUNT(DISTINCT customer_unique_id) AS customer_count
+8,What are the top 5 customer cities by number of customers?,easy,single_table|group_by|order_limit,True,1,1.51,"SELECT customer_city, COUNT(DISTINCT customer_unique_id) AS customer_count
 FROM customers
 GROUP BY customer_city
 ORDER BY customer_count DESC
-LIMIT 5;",False,SELECT 'no baseline rule matched' AS result,"SELECT customer_city, COUNT(DISTINCT customer_unique_id) AS cnt
+LIMIT 5",True,"SELECT customer_city, COUNT(DISTINCT customer_unique_id) AS customer_count
+FROM customers
+GROUP BY customer_city
+ORDER BY customer_count DESC
+LIMIT 5;",False,SELECT 'no rule matched' AS result,"SELECT customer_city, COUNT(DISTINCT customer_unique_id) AS cnt
 FROM customers GROUP BY customer_city ORDER BY cnt DESC LIMIT 5"
-9,What are the top 5 product categories by number of items sold?,medium,join|group_by|order_limit,False,1,2.69,"SELECT 
+9,What are the top 5 product categories by number of items sold?,medium,join|group_by|order_limit,True,1,2.81,"SELECT 
     COALESCE(t.product_category_name_english, p.product_category_name) AS category,
-    COUNT(oi.order_id) AS items_sold
+    COUNT(oi.order_item_id) AS items_sold
 FROM order_items oi
 JOIN products p ON oi.product_id = p.product_id
 LEFT JOIN category_translation t ON p.product_category_name = t.product_category_name
 GROUP BY category
 ORDER BY items_sold DESC
-LIMIT 5",False,SELECT 'no baseline rule matched' AS result,"SELECT p.product_category_name, COUNT(*) AS items_sold
+LIMIT 5",True,"SELECT 
+    t.product_category_name_english AS category, 
+    COUNT(oi.order_id) AS items_sold
 FROM order_items oi
 JOIN products p ON oi.product_id = p.product_id
+JOIN category_translation t ON p.product_category_name = t.product_category_name
+GROUP BY t.product_category_name_english
+ORDER BY items_sold DESC
+LIMIT 5;",False,SELECT 'no rule matched' AS result,"SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+       COUNT(*) AS items_sold
+FROM order_items oi
+JOIN products p ON oi.product_id = p.product_id
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
 WHERE p.product_category_name IS NOT NULL
-GROUP BY p.product_category_name
+GROUP BY category
 ORDER BY items_sold DESC
 LIMIT 5"
-10,What is the average order value?,medium,subquery|aggregate,True,1,1.48,"SELECT AVG(order_total) FROM (SELECT order_id, SUM(price) AS order_total FROM order_items GROUP BY order_id)",False,SELECT 'no baseline rule matched' AS result,"SELECT ROUND(AVG(order_total), 2) FROM (
+10,What is the average order value?,medium,subquery|aggregate,True,1,1.44,"SELECT AVG(order_total) FROM (SELECT order_id, SUM(price) AS order_total FROM order_items GROUP BY order_id)",False,"SELECT AVG(order_total) FROM (SELECT order_id, SUM(price + freight_value) AS order_total FROM order_items GROUP BY order_id)",False,SELECT 'no rule matched' AS result,"SELECT ROUND(AVG(order_total), 2) FROM (
   SELECT order_id, SUM(price) AS order_total
   FROM order_items GROUP BY order_id
 )"
-11,Which city has the most sellers?,medium,single_table|group_by|order_limit,False,1,0.75,SELECT seller_city FROM sellers GROUP BY seller_city ORDER BY COUNT(seller_id) DESC LIMIT 1;,False,SELECT 'no baseline rule matched' AS result,"SELECT seller_city, COUNT(*) AS cnt
-FROM sellers GROUP BY seller_city ORDER BY cnt DESC LIMIT 1"
-12,Which payment type has the highest average payment value?,medium,single_table|group_by|aggregate,False,1,0.89,"SELECT payment_type
+11,Which city has the most sellers?,medium,single_table|group_by|order_limit,True,1,0.78,"SELECT seller_city
+FROM sellers
+GROUP BY seller_city
+ORDER BY COUNT(seller_id) DESC
+LIMIT 1",True,SELECT seller_city FROM sellers GROUP BY seller_city ORDER BY count(*) DESC LIMIT 1,False,SELECT 'no rule matched' AS result,"SELECT seller_city FROM sellers
+GROUP BY seller_city ORDER BY COUNT(*) DESC LIMIT 1"
+12,Which payment type has the highest average payment value?,medium,single_table|group_by|aggregate,True,1,1.2,"SELECT payment_type
 FROM order_payments
 GROUP BY payment_type
 ORDER BY AVG(payment_value) DESC
-LIMIT 1;",False,SELECT 'no baseline rule matched' AS result,"SELECT payment_type, ROUND(AVG(payment_value), 2) AS avg_val
-FROM order_payments GROUP BY payment_type ORDER BY avg_val DESC LIMIT 1"
-13,How many orders contained more than one item?,medium,subquery|having|count,True,1,1.02,"SELECT COUNT(*) FROM (
-    SELECT order_id
-    FROM order_items
-    GROUP BY order_id
-    HAVING COUNT(*) > 1
-)",False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM (
+LIMIT 1",True,SELECT payment_type FROM order_payments GROUP BY payment_type ORDER BY AVG(payment_value) DESC LIMIT 1,False,SELECT 'no rule matched' AS result,"SELECT payment_type FROM order_payments
+GROUP BY payment_type ORDER BY AVG(payment_value) DESC LIMIT 1"
+13,How many orders contained more than one item?,medium,subquery|having|count,True,1,1.13,SELECT COUNT(*) FROM (SELECT order_id FROM order_items GROUP BY order_id HAVING COUNT(*) > 1),True,SELECT count(order_id) FROM (SELECT order_id FROM order_items GROUP BY order_id HAVING count(product_id) > 1),False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM (
   SELECT order_id FROM order_items
   GROUP BY order_id HAVING COUNT(*) > 1
 )"
-14,What are the top 5 sellers by total revenue?,medium,group_by|aggregate|order_limit,True,1,1.61,"SELECT seller_id, SUM(price) AS total_revenue
+14,What are the top 5 sellers by total revenue?,medium,group_by|aggregate|order_limit,True,1,1.41,"SELECT seller_id, SUM(price) AS total_revenue
 FROM order_items
 GROUP BY seller_id
 ORDER BY total_revenue DESC
-LIMIT 5;",False,SELECT 'no baseline rule matched' AS result,"SELECT seller_id, ROUND(SUM(price), 2) AS revenue
+LIMIT 5;",False,"SELECT 
+    s.seller_id
+FROM sellers s
+JOIN order_items oi ON s.seller_id = oi.seller_id
+GROUP BY s.seller_id
+ORDER BY SUM(oi.price + oi.freight_value) DESC
+LIMIT 5;",False,SELECT 'no rule matched' AS result,"SELECT seller_id, ROUND(SUM(price), 2) AS revenue
 FROM order_items GROUP BY seller_id ORDER BY revenue DESC LIMIT 5"
-15,What is the average review score per product category? Show the top 10.,medium,multi_join|group_by|aggregate,False,1,3.99,"SELECT 
-    COALESCE(t.product_category_name_english, p.product_category_name) AS category,
+15,What is the average review score per product category? Show the top 10.,medium,multi_join|group_by|aggregate,False,1,3.91,"SELECT 
+    COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+    AVG(r.review_score) AS avg_review_score
+FROM order_reviews r
+JOIN order_items oi ON r.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
+GROUP BY category
+ORDER BY avg_review_score DESC
+LIMIT 10",False,"SELECT 
+    t.product_category_name_english,
     AVG(r.review_score) AS avg_review_score
 FROM order_reviews r
 JOIN order_items i ON r.order_id = i.order_id
 JOIN products p ON i.product_id = p.product_id
-LEFT JOIN category_translation t ON p.product_category_name = t.product_category_name
-GROUP BY category
+JOIN category_translation t ON p.product_category_name = t.product_category_name
+GROUP BY t.product_category_name_english
 ORDER BY avg_review_score DESC
-LIMIT 10",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT p.product_category_name, ROUND(AVG(r.review_score), 2) AS avg_score
+LIMIT 10;",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+       ROUND(AVG(r.review_score), 2) AS avg_score
 FROM order_reviews r
 JOIN order_items oi ON r.order_id = oi.order_id
 JOIN products p ON oi.product_id = p.product_id
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
 WHERE p.product_category_name IS NOT NULL
-GROUP BY p.product_category_name
+GROUP BY category
 ORDER BY avg_score DESC
 LIMIT 10"
-16,Which customer state has the highest total order value?,medium,multi_join|group_by|aggregate,False,1,3.92,"SELECT 
-    c.customer_state
+16,Which customer state has the highest total order value?,medium,multi_join|group_by|aggregate,True,1,4.01,"SELECT c.customer_state 
+FROM customers c 
+JOIN orders o ON c.customer_id = o.customer_id 
+JOIN order_items oi ON o.order_id = oi.order_id 
+GROUP BY c.customer_state 
+ORDER BY SUM(oi.price) DESC 
+LIMIT 1",True,"SELECT c.customer_state
 FROM customers c
 JOIN orders o ON c.customer_id = o.customer_id
 JOIN order_items oi ON o.order_id = oi.order_id
 GROUP BY c.customer_state
-ORDER BY SUM(oi.price) DESC
-LIMIT 1",False,SELECT 'no baseline rule matched' AS result,"SELECT c.customer_state, ROUND(SUM(oi.price), 2) AS total_value
+ORDER BY SUM(oi.price + oi.freight_value) DESC
+LIMIT 1;",False,SELECT 'no rule matched' AS result,"SELECT c.customer_state
 FROM order_items oi
 JOIN orders o ON oi.order_id = o.order_id
 JOIN customers c ON o.customer_id = c.customer_id
 GROUP BY c.customer_state
-ORDER BY total_value DESC
+ORDER BY SUM(oi.price) DESC
 LIMIT 1"
-17,How many orders were paid using more than one payment type?,medium,subquery|having|distinct,True,1,1.77,SELECT COUNT(*) FROM (SELECT order_id FROM order_payments GROUP BY order_id HAVING COUNT(DISTINCT payment_type) > 1),False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM (
+17,How many orders were paid using more than one payment type?,medium,subquery|having|distinct,True,1,1.79,"SELECT COUNT(*) FROM (
+    SELECT order_id
+    FROM order_payments
+    GROUP BY order_id
+    HAVING COUNT(DISTINCT payment_type) > 1
+)",True,SELECT count(order_id) FROM (SELECT order_id FROM order_payments GROUP BY order_id HAVING count(DISTINCT payment_type) > 1),False,SELECT COUNT(*) FROM orders,"SELECT COUNT(*) FROM (
   SELECT order_id FROM order_payments
   GROUP BY order_id HAVING COUNT(DISTINCT payment_type) > 1
 )"
-18,What is the monthly order count for 2018?,medium,date|group_by,True,1,1.16,"SELECT 
-    substr(order_purchase_timestamp, 1, 7) AS month,
-    COUNT(order_id) AS order_count
-FROM orders
-WHERE substr(order_purchase_timestamp, 1, 4) = '2018'
-GROUP BY month
-ORDER BY month;",False,SELECT 'no baseline rule matched' AS result,"SELECT substr(order_purchase_timestamp, 1, 7) AS month,
+18,What is the monthly order count for 2018?,medium,date|group_by,True,1,1.23,"SELECT 
+    substr(order_purchase_timestamp, 1, 7) AS month, 
+    COUNT(order_id) AS order_count 
+FROM 
+    orders 
+WHERE 
+    substr(order_purchase_timestamp, 1, 4) = '2018' 
+GROUP BY 
+    month 
+ORDER BY 
+    month;",True,"SELECT 
+    strftime('%Y-%m', order_purchase_timestamp) AS month, 
+    COUNT(order_id) AS order_count 
+FROM 
+    orders 
+WHERE 
+    strftime('%Y', order_purchase_timestamp) = '2018' 
+GROUP BY 
+    month 
+ORDER BY 
+    month;",False,SELECT 'no rule matched' AS result,"SELECT substr(order_purchase_timestamp, 1, 7) AS month,
        COUNT(*) AS order_count
 FROM orders
 WHERE substr(order_purchase_timestamp, 1, 4) = '2018'
 GROUP BY month
 ORDER BY month"
-19,What is the total freight cost by seller state?,medium,join|group_by|aggregate,True,1,1.67,"SELECT 
-    s.seller_state, 
-    SUM(oi.freight_value) AS total_freight
+19,What is the total freight cost by seller state?,medium,join|group_by|aggregate,True,1,1.61,"SELECT s.seller_state, SUM(oi.freight_value) AS total_freight
 FROM sellers s
 JOIN order_items oi ON s.seller_id = oi.seller_id
 GROUP BY s.seller_state
-ORDER BY total_freight DESC;",False,SELECT 'no baseline rule matched' AS result,"SELECT s.seller_state, ROUND(SUM(oi.freight_value), 2) AS total_freight
+ORDER BY total_freight DESC",False,"SELECT 
+    t2.seller_state, 
+    SUM(t1.freight_value) AS total_freight 
+FROM order_items AS t1 
+JOIN sellers AS t2 
+ON t1.seller_id = t2.seller_id 
+GROUP BY t2.seller_state;",False,SELECT 'no rule matched' AS result,"SELECT s.seller_state, ROUND(SUM(oi.freight_value), 2) AS total_freight
 FROM order_items oi
 JOIN sellers s ON oi.seller_id = s.seller_id
 GROUP BY s.seller_state
 ORDER BY total_freight DESC"
-20,What product category has the highest average product weight?,medium,single_table|group_by|aggregate|null_handling,False,1,1.36,"SELECT COALESCE(t.product_category_name_english, p.product_category_name) AS category, AVG(p.product_weight_g) AS avg_weight
+20,What product category has the highest average product weight?,medium,join|group_by|aggregate|null_handling,False,1,1.51,"SELECT COALESCE(t.product_category_name_english, p.product_category_name) AS category
 FROM products p
 LEFT JOIN category_translation t ON p.product_category_name = t.product_category_name
 GROUP BY category
-ORDER BY avg_weight DESC
-LIMIT 1",False,SELECT 'no baseline rule matched' AS result,"SELECT product_category_name, ROUND(AVG(product_weight_g), 2) AS avg_weight
-FROM products
-WHERE product_category_name IS NOT NULL AND product_weight_g IS NOT NULL
-GROUP BY product_category_name
+ORDER BY AVG(p.product_weight_g) DESC
+LIMIT 1",False,"SELECT t.product_category_name_english 
+FROM products p 
+JOIN category_translation t ON p.product_category_name = t.product_category_name 
+GROUP BY t.product_category_name_english 
+ORDER BY AVG(p.product_weight_g) DESC 
+LIMIT 1",False,SELECT 'no rule matched' AS result,"SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+       ROUND(AVG(p.product_weight_g), 2) AS avg_weight
+FROM products p
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
+WHERE p.product_category_name IS NOT NULL AND p.product_weight_g IS NOT NULL
+GROUP BY category
 ORDER BY avg_weight DESC
 LIMIT 1"
-21,"Which seller had the highest average review score, among sellers with at least 50 orders?",hard,join|having|aggregate|fan_out_risk,False,1,3.22,"SELECT oi.seller_id
+21,"Which seller had the highest average review score, among sellers with at least 50 orders?",hard,join|having|aggregate|fan_out_risk,True,1,3.64,"SELECT t1.seller_id
+FROM order_items AS t1
+JOIN order_reviews AS t2 ON t1.order_id = t2.order_id
+GROUP BY t1.seller_id
+HAVING COUNT(DISTINCT t1.order_id) >= 50
+ORDER BY AVG(t2.review_score) DESC
+LIMIT 1",True,"SELECT t1.seller_id
+FROM order_items AS t1
+JOIN order_reviews AS t2 ON t1.order_id = t2.order_id
+GROUP BY t1.seller_id
+HAVING COUNT(DISTINCT t1.order_id) >= 50
+ORDER BY AVG(t2.review_score) DESC
+LIMIT 1;",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT oi.seller_id
 FROM order_items oi
 JOIN order_reviews r ON oi.order_id = r.order_id
 GROUP BY oi.seller_id
 HAVING COUNT(DISTINCT oi.order_id) >= 50
 ORDER BY AVG(r.review_score) DESC
-LIMIT 1",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT oi.seller_id, ROUND(AVG(r.review_score), 2) AS avg_score
-FROM order_items oi
-JOIN order_reviews r ON oi.order_id = r.order_id
-GROUP BY oi.seller_id
-HAVING COUNT(DISTINCT oi.order_id) >= 50
-ORDER BY avg_score DESC
 LIMIT 1"
-22,What percentage of delivered orders were delivered late (after the estimated delivery date)?,hard,date|case_when|percentage,True,1,1.42,"SELECT 
-    ROUND(100.0 * SUM(CASE WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1 ELSE 0 END) / COUNT(order_id), 4) AS percentage_late
+22,What percentage of delivered orders were delivered late (after the estimated delivery date)?,hard,date|case_when|percentage,True,1,1.28,"SELECT 
+  (CAST(SUM(CASE WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 AS percentage_late
 FROM orders
-WHERE order_status = 'delivered';",False,SELECT 'no baseline rule matched' AS result,"SELECT ROUND(
+WHERE order_status = 'delivered'",True,"SELECT 
+    ROUND(
+        SUM(CASE WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 
+        4
+    ) AS percentage_late
+FROM orders
+WHERE order_status = 'delivered'
+  AND order_delivered_customer_date IS NOT NULL
+  AND order_estimated_delivery_date IS NOT NULL;",False,SELECT 'no rule matched' AS result,"SELECT ROUND(
   100.0 * SUM(CASE
     WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1
     ELSE 0
@@ -155,7 +236,7 @@ FROM orders
 WHERE order_status = 'delivered'
   AND order_delivered_customer_date IS NOT NULL
   AND order_estimated_delivery_date IS NOT NULL"
-23,What is the average delivery time in days per month for delivered orders in 2017?,hard,date_arithmetic|group_by|julianday,True,1,1.57,"SELECT 
+23,What is the average delivery time in days per month for delivered orders in 2017?,hard,date_arithmetic|group_by|julianday,True,1,1.49,"SELECT 
     substr(order_purchase_timestamp, 1, 7) AS month,
     AVG(julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)) AS avg_delivery_days
 FROM orders
@@ -164,7 +245,16 @@ WHERE order_status = 'delivered'
   AND order_delivered_customer_date IS NOT NULL
   AND order_purchase_timestamp IS NOT NULL
 GROUP BY month
-ORDER BY month;",False,SELECT 'no baseline rule matched' AS result,"SELECT substr(order_purchase_timestamp, 1, 7) AS month,
+ORDER BY month;",True,"SELECT 
+    strftime('%Y-%m', order_purchase_timestamp) AS month,
+    avg(julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)) AS avg_delivery_days
+FROM orders
+WHERE order_status = 'delivered'
+  AND strftime('%Y', order_purchase_timestamp) = '2017'
+  AND order_delivered_customer_date IS NOT NULL
+  AND order_purchase_timestamp IS NOT NULL
+GROUP BY month
+ORDER BY month;",False,SELECT 'no rule matched' AS result,"SELECT substr(order_purchase_timestamp, 1, 7) AS month,
        ROUND(AVG(
          julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)
        ), 2) AS avg_delivery_days
@@ -174,41 +264,72 @@ WHERE order_status = 'delivered'
   AND substr(order_purchase_timestamp, 1, 4) = '2017'
 GROUP BY month
 ORDER BY month"
-24,What is the cancellation rate by product category? Show categories with at least 20 orders.,hard,multi_join|case_when|having|percentage,False,2,6.11,"SELECT 
-    COALESCE(t.product_category_name_english, p.product_category_name) AS category,
+24,What is the cancellation rate by product category? Show categories with at least 20 orders.,hard,multi_join|case_when|having|percentage,False,1,3.9,"SELECT 
+    COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
     COUNT(DISTINCT o.order_id) AS total_orders,
-    COUNT(DISTINCT CASE WHEN o.order_status = 'canceled' THEN o.order_id END) AS canceled_orders,
-    CAST(COUNT(DISTINCT CASE WHEN o.order_status = 'canceled' THEN o.order_id END) AS REAL) / COUNT(DISTINCT o.order_id) AS cancellation_rate
+    SUM(CASE WHEN o.order_status = 'canceled' THEN 1 ELSE 0 END) AS canceled_orders,
+    CAST(SUM(CASE WHEN o.order_status = 'canceled' THEN 1 ELSE 0 END) AS REAL) / COUNT(DISTINCT o.order_id) AS cancellation_rate
+FROM orders o
+JOIN order_items oi ON o.order_id = oi.order_id
+JOIN products p ON oi.product_id = p.product_id
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
+GROUP BY category
+HAVING total_orders >= 20
+ORDER BY cancellation_rate DESC",False,"SELECT 
+    t.product_category_name_english AS category,
+    CAST(SUM(CASE WHEN o.order_status = 'canceled' THEN 1 ELSE 0 END) AS REAL) / COUNT(o.order_id) AS cancellation_rate,
+    COUNT(o.order_id) as total_orders
 FROM orders o
 JOIN order_items oi ON o.order_id = oi.order_id
 JOIN products p ON oi.product_id = p.product_id
 LEFT JOIN category_translation t ON p.product_category_name = t.product_category_name
-GROUP BY category
-HAVING COUNT(DISTINCT o.order_id) >= 20
-ORDER BY cancellation_rate DESC;",False,SELECT 'no baseline rule matched' AS result,"SELECT p.product_category_name,
+GROUP BY t.product_category_name_english
+HAVING COUNT(o.order_id) >= 20
+ORDER BY cancellation_rate DESC;",False,SELECT 'no rule matched' AS result,"SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
        ROUND(100.0 * SUM(CASE WHEN o.order_status = 'canceled' THEN 1 ELSE 0 END)
              / COUNT(DISTINCT o.order_id), 2) AS cancel_rate_pct
 FROM order_items oi
 JOIN orders o ON oi.order_id = o.order_id
 JOIN products p ON oi.product_id = p.product_id
+LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
 WHERE p.product_category_name IS NOT NULL
-GROUP BY p.product_category_name
+GROUP BY category
 HAVING COUNT(DISTINCT o.order_id) >= 20
 ORDER BY cancel_rate_pct DESC"
-25,"For each customer state, what is the average order value and average review score?",hard,multi_join|subquery|aggregate|fan_out_risk,False,1,4.33,"SELECT 
+25,"For each customer state, what is the average order value and average review score?",hard,multi_join|subquery|aggregate|fan_out_risk,False,1,6.57,"WITH order_totals AS (
+    SELECT o.order_id, o.customer_id, SUM(oi.price) AS order_value
+    FROM orders o
+    JOIN order_items oi ON o.order_id = oi.order_id
+    GROUP BY o.order_id
+),
+order_reviews_agg AS (
+    SELECT order_id, AVG(review_score) AS avg_review_score
+    FROM order_reviews
+    GROUP BY order_id
+)
+SELECT 
     c.customer_state,
     AVG(ot.order_value) AS avg_order_value,
-    AVG(r.review_score) AS avg_review_score
+    AVG(ora.avg_review_score) AS avg_review_score
 FROM customers c
 JOIN orders o ON c.customer_id = o.customer_id
-JOIN (
-    SELECT order_id, SUM(price) AS order_value
-    FROM order_items
-    GROUP BY order_id
-) ot ON o.order_id = ot.order_id
-LEFT JOIN order_reviews r ON o.order_id = r.order_id
+JOIN order_totals ot ON o.order_id = ot.order_id
+LEFT JOIN order_reviews_agg ora ON o.order_id = ora.order_id
 GROUP BY c.customer_state
-ORDER BY c.customer_state;",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT c.customer_state,
+ORDER BY c.customer_state;",False,"SELECT 
+    c.customer_state,
+    AVG(op.payment_value) AS avg_order_value,
+    AVG(r.review_score) AS avg_review_score
+FROM 
+    customers c
+JOIN 
+    orders o ON c.customer_id = o.customer_id
+JOIN 
+    order_payments op ON o.order_id = op.order_id
+JOIN 
+    order_reviews r ON o.order_id = r.order_id
+GROUP BY 
+    c.customer_state;",False,"SELECT ROUND(AVG(review_score), 4) FROM order_reviews","SELECT c.customer_state,
        ROUND(AVG(ov.order_total), 2) AS avg_order_value,
        ROUND(AVG(r.review_score), 2) AS avg_review_score
 FROM orders o
@@ -220,20 +341,20 @@ JOIN (
 ) ov ON o.order_id = ov.order_id
 GROUP BY c.customer_state
 ORDER BY avg_order_value DESC"
-26,How many repeat customers are there (customers who placed more than one order)?,hard,join|subquery|having|tricky_id,True,1,2.76,"SELECT COUNT(*) FROM (
+26,How many repeat customers are there (customers who placed more than one order)?,hard,join|subquery|having|tricky_id,True,1,2.54,"SELECT COUNT(*) FROM (
     SELECT c.customer_unique_id
     FROM orders o
     JOIN customers c ON o.customer_id = c.customer_id
     GROUP BY c.customer_unique_id
     HAVING COUNT(o.order_id) > 1
-)",False,SELECT COUNT(*) FROM customers,"SELECT COUNT(*) FROM (
+)",True,SELECT count(*) FROM (SELECT customer_unique_id FROM orders JOIN customers ON orders.customer_id = customers.customer_id GROUP BY customer_unique_id HAVING count(order_id) > 1),False,SELECT COUNT(*) FROM customers,"SELECT COUNT(*) FROM (
   SELECT customer_unique_id
   FROM orders o
   JOIN customers c ON o.customer_id = c.customer_id
   GROUP BY c.customer_unique_id
   HAVING COUNT(DISTINCT o.order_id) > 1
 )"
-27,What is the month-over-month order count growth rate for 2018?,hard,cte|window_function|date|growth_rate,False,1,1.78,"WITH monthly_orders AS (
+27,What is the month-over-month order count growth rate for 2018?,hard,cte|window_function|date|growth_rate,False,1,1.42,"WITH monthly_orders AS (
     SELECT 
         substr(order_purchase_timestamp, 1, 7) AS month,
         COUNT(DISTINCT order_id) AS order_count
@@ -244,10 +365,33 @@ ORDER BY avg_order_value DESC"
 SELECT 
     month,
     order_count,
-    LAG(order_count, 1) OVER (ORDER BY month) AS prev_month_order_count,
-    CAST((order_count - LAG(order_count, 1) OVER (ORDER BY month)) AS REAL) / LAG(order_count, 1) OVER (ORDER BY month) AS growth_rate
+    LAG(order_count) OVER (ORDER BY month) AS prev_month_order_count,
+    (CAST(order_count AS REAL) - LAG(order_count) OVER (ORDER BY month)) / LAG(order_count) OVER (ORDER BY month) * 100 AS growth_rate
 FROM monthly_orders
-ORDER BY month;",False,SELECT 'no baseline rule matched' AS result,"WITH monthly AS (
+ORDER BY month;",False,"WITH monthly_orders AS (
+    SELECT 
+        strftime('%Y-%m', order_purchase_timestamp) AS order_month,
+        COUNT(order_id) AS order_count
+    FROM orders
+    WHERE strftime('%Y', order_purchase_timestamp) = '2018'
+    GROUP BY order_month
+),
+growth_calc AS (
+    SELECT 
+        order_month,
+        order_count,
+        LAG(order_count) OVER (ORDER BY order_month) AS prev_month_count
+    FROM monthly_orders
+)
+SELECT 
+    order_month,
+    order_count,
+    prev_month_count,
+    CASE 
+        WHEN prev_month_count IS NULL OR prev_month_count = 0 THEN NULL
+        ELSE CAST(order_count - prev_month_count AS REAL) / prev_month_count
+    END AS growth_rate
+FROM growth_calc;",False,SELECT 'no rule matched' AS result,"WITH monthly AS (
   SELECT substr(order_purchase_timestamp, 1, 7) AS month,
          COUNT(*) AS cnt
   FROM orders
@@ -264,16 +408,25 @@ SELECT month, cnt, prev_cnt,
 FROM with_lag
 WHERE prev_cnt IS NOT NULL
 ORDER BY month"
-28,"Which sellers have the highest percentage of 5-star reviews, among those with at least 30 reviews?",hard,join|case_when|having|percentage|fan_out_risk,False,1,3.7,"SELECT 
+28,"Which sellers have the highest percentage of 5-star reviews, among those with at least 30 reviews?",hard,join|case_when|having|percentage|fan_out_risk,False,1,3.77,"SELECT 
     oi.seller_id,
-    COUNT(r.review_id) AS total_reviews,
-    SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS five_star_count,
-    (CAST(SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS REAL) * 100) / COUNT(r.review_id) AS five_star_percentage
+    COUNT(r.review_score) AS total_reviews,
+    SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS five_star_reviews,
+    (SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) * 100.0 / COUNT(r.review_score)) AS percentage_5_star
 FROM order_items oi
 JOIN order_reviews r ON oi.order_id = r.order_id
 GROUP BY oi.seller_id
-HAVING COUNT(r.review_id) >= 30
-ORDER BY five_star_percentage DESC",False,SELECT 'no baseline rule matched' AS result,"SELECT oi.seller_id,
+HAVING COUNT(r.review_score) >= 30
+ORDER BY percentage_5_star DESC;",False,"SELECT 
+    s.seller_id
+FROM sellers s
+JOIN order_items oi ON s.seller_id = oi.seller_id
+JOIN order_reviews orv ON oi.order_id = orv.order_id
+GROUP BY s.seller_id
+HAVING COUNT(orv.review_id) >= 30
+ORDER BY CAST(SUM(CASE WHEN orv.review_score = 5 THEN 1 ELSE 0 END) AS REAL) / COUNT(orv.review_id) DESC, 
+         s.seller_id ASC
+LIMIT 1;",False,SELECT 'no rule matched' AS result,"SELECT oi.seller_id,
        COUNT(*) AS total_reviews,
        SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS five_star,
        ROUND(100.0 * SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_five_star
@@ -283,7 +436,7 @@ GROUP BY oi.seller_id
 HAVING COUNT(*) >= 30
 ORDER BY pct_five_star DESC
 LIMIT 10"
-29,"What is the average time between order approval and carrier pickup, in hours, by seller state?",hard,multi_join|date_arithmetic|julianday|fan_out_risk,False,1,3.08,"SELECT 
+29,"What is the average time between order approval and carrier pickup, in hours, by seller state?",hard,multi_join|date_arithmetic|julianday|fan_out_risk,True,1,2.68,"SELECT 
     s.seller_state,
     AVG((julianday(o.order_delivered_carrier_date) - julianday(o.order_approved_at)) * 24) AS avg_hours_to_carrier
 FROM orders o
@@ -291,7 +444,23 @@ JOIN order_items oi ON o.order_id = oi.order_id
 JOIN sellers s ON oi.seller_id = s.seller_id
 WHERE o.order_approved_at IS NOT NULL 
   AND o.order_delivered_carrier_date IS NOT NULL
-GROUP BY s.seller_state;",False,SELECT 'no baseline rule matched' AS result,"SELECT s.seller_state,
+GROUP BY s.seller_state
+ORDER BY avg_hours_to_carrier ASC;",False,"SELECT 
+    s.seller_state,
+    AVG(
+        (julianday(o.shipping_limit_date) - julianday(o.order_approved_at)) * 24
+    ) AS avg_time_to_carrier_hours
+FROM 
+    orders o
+JOIN 
+    order_items oi ON o.order_id = oi.order_id
+JOIN 
+    sellers s ON oi.seller_id = s.seller_id
+WHERE 
+    o.order_approved_at IS NOT NULL 
+    AND o.shipping_limit_date IS NOT NULL
+GROUP BY 
+    s.seller_state;",False,SELECT 'no rule matched' AS result,"SELECT s.seller_state,
        ROUND(AVG(
          (julianday(o.order_delivered_carrier_date) - julianday(o.order_approved_at)) * 24
        ), 2) AS avg_hours_to_ship
@@ -302,15 +471,23 @@ WHERE o.order_approved_at IS NOT NULL
   AND o.order_delivered_carrier_date IS NOT NULL
 GROUP BY s.seller_state
 ORDER BY avg_hours_to_ship"
-30,What is the revenue per product category in English? Show the top 10.,hard,multi_join|left_join|coalesce|aggregate,True,1,2.42,"SELECT 
-    COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+30,What is the revenue per product category in English? Show the top 10.,hard,multi_join|left_join|coalesce|aggregate,True,1,2.12,"SELECT 
+    COALESCE(ct.product_category_name_english, p.product_category_name) AS category_english,
     SUM(oi.price) AS total_revenue
 FROM order_items oi
 JOIN products p ON oi.product_id = p.product_id
 LEFT JOIN category_translation ct ON p.product_category_name = ct.product_category_name
-GROUP BY category
+GROUP BY category_english
 ORDER BY total_revenue DESC
-LIMIT 10",False,SELECT 'no baseline rule matched' AS result,"SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
+LIMIT 10",False,"SELECT 
+    t.product_category_name_english,
+    SUM(oi.price + oi.freight_value) AS revenue
+FROM order_items oi
+JOIN products p ON oi.product_id = p.product_id
+JOIN category_translation t ON p.product_category_name = t.product_category_name
+GROUP BY t.product_category_name_english
+ORDER BY revenue DESC
+LIMIT 10;",False,SELECT 'no rule matched' AS result,"SELECT COALESCE(ct.product_category_name_english, p.product_category_name) AS category,
        ROUND(SUM(oi.price), 2) AS revenue
 FROM order_items oi
 JOIN products p ON oi.product_id = p.product_id
