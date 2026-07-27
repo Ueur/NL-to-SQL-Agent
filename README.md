@@ -29,9 +29,9 @@ Evaluated on 30 questions (8 easy, 12 medium, 10 hard). Scored on result match, 
 
 | Setup | Accuracy | What it tests |
 |-------|----------|---------------|
-| Keyword baseline (no AI) | 3/30 (10%) | Can you do this without an LLM at all? |
-| Raw LLM (no schema/retry) | 19/30 (63%) | What does the LLM add by itself? |
-| **Full agent** | **24/30 (80%)** | What does the engineering add on top? |
+| Keyword baseline (no AI) | 3/30 (10%) | Not using an LLM |
+| Raw LLM (no schema/retry) | 19/30 (63%) | Using an LLM out-of-the-box |
+| **Full agent** | **24/30 (80%)** | Modifying the infrastructure of the raw LLM |
 
 By difficulty:
 
