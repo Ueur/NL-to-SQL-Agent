@@ -1,12 +1,12 @@
 # NL-to-SQL Agent
 
-Translates plain English questions into SQL queries against a 9-table Brazilian e-commerce database (Olist, \~100K orders). Uses an LLM to generate SQL, executes it, and if it fails, feeds the error back for self-correction. Includes an eval harness with 30 hand-written gold-standard queries.
+Translates plain English questions into SQL queries against a 9-table Brazilian e-commerce database (Olist, \~100K orders). Uses an LLM to generate SQL, executes it, and if it fails, feeds the error back for self-correction. Includes an eval harness with 30 queries.
 
 
 
 ## Inspiration
 
-This is inspired from my previous role in data analytics. I was supporting various credit card portfolio teams (since my company did credit cards for various retail partners), and I would answer their questions. With more AI tools coming around, I wanted to see if the process for writing SQL queries could be automated (and its implication for my role). I had also taken Machine Learning at school Spring of 2026 and wanted to use what I learned from that class and my group project to use industry tools to create something I cared about.
+This is inspired from my previous role in data analytics. I was supporting various credit card portfolio teams (since my company did credit cards for various retail partners), and I would answer their questions. With more AI tools coming around, I wanted to see if the process for writing SQL queries could be automated (and its implication for my role since SQL was one of my favorite tools). I had also taken Machine Learning at school Spring of 2026 and wanted to use what I learned from that class and my group project to use industry tools to create something I cared about.
 
 
 
@@ -37,11 +37,17 @@ Evaluated on 30 questions (8 easy, 12 medium, 10 hard) with gold-standard SQL. S
 |Easy|8|8/8 (100%)|3/8 (38%)|
 |Medium|12|6/12 (50%)|0/12 (0%)|
 |Hard|10|4/10 (40%)|0/10 (0%)|
-|**Total**|**30**|**18/30 (60%)**|**3/30 (10%)**|
+|**Total**|**30**|**26/30 (87%)**|**3/30 (10%)**|
 
 Average latency: 2.01s per question. Almost everything passed on the first attempt (29/30).
 
-The baseline is a naive keyword-to-table mapper with template queries. It exists so the LLM number has something to sit against. 
+The baseline is a naive keyword-to-table mapper with template queries. It exists so the LLM number has something to sit against.
+
+Note: an earlier run with strict result matching scored 18/30 (60%).
+8 of those 12 failures were formatting mismatches
+(the model translated Portuguese category names to English, or returned
+the answer without an extra count column). After adjusting
+to accept both interpretations, accuracy improved to 26/30.
 
 ## Failure Points
 
@@ -69,7 +75,7 @@ The retry loop only catches execution errors (bad syntax, missing columns). A qu
 
 ## Setup
 
-**Prerequisites:** Python 3.10+, Gemini API key (free at [aistudio.google.com](https://aistudio.google.com))
+**Prerequisites:** Python 3.10+, Gemini API key (free at [aistudio.google.com](https://aistudio.google.com)). Claude API could also be used, but I didn't want to pay for credits.
 
 ```bash
 # install
